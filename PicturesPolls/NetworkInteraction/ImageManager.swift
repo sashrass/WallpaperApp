@@ -1,48 +1,34 @@
 import Foundation
 import UIKit
 
-struct PhotosApiFetcher {
+class ImageManager {
+    
+    var dataTasks: [URLSessionDataTask] = []
     
     private let clientId = "hU9N-jVL8vW6KjYQEsyqJHKYHtXL8ugG6u4J2T-FY3s"
-    static let imageCache: NSCache<NSString, UIImage> = {
+    private static let imageCache: NSCache<NSString, UIImage> = {
         let nsCache = NSCache<NSString, UIImage>()
-        nsCache.countLimit = 50
+        nsCache.countLimit = 100
         
         return nsCache
     }()
-    
-    func isImageinCache(url: String) -> Bool {
-        if let _ = PhotosApiFetcher.imageCache.object(forKey: url as NSString) {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    private func getData(from url: String) async -> Data? {
+        
+    private func fetchData(from url: String) async -> Data? {
         guard let url = URL(string: url) else {
             return nil
         }
         
-        do {
-            let data = try await URLSession.shared.data(from: url)
-            return data.0
+        let data: Data? = await withCheckedContinuation { [weak self] continuation in
+            
+            let dataTask = URLSession.shared.dataTask(with: url) { data, _, _ in
+                continuation.resume(returning: data)
+            }
+            
+            self?.dataTasks.append(dataTask)
+            dataTask.resume()
         }
-        catch {
-            return nil
-        }
-    }
-    
-    
-    private func constructURL(path: String, queryItems: [URLQueryItem]) -> String? {
-        var url = URLComponents()
-        url.scheme = "https"
-        url.host = "api.unsplash.com"
-        url.path = path
-        url.queryItems = queryItems
         
-        print("url constructed")
-        return url.url?.absoluteString
+        return data
     }
     
     func fetchListOfPhotos(page: Int) async -> [PhotoListApiResponse]? {
@@ -56,7 +42,7 @@ struct PhotosApiFetcher {
             return nil
         }
         
-        guard let data = await getData(from: url) else {
+        guard let data = await fetchData(from: url) else {
             return nil
         }
         
@@ -74,31 +60,31 @@ struct PhotosApiFetcher {
         }
     }
     
-    func getImageBy(url: String) async -> UIImage? {
-        if isImageinCache(url: url) {
-            let image = PhotosApiFetcher.imageCache.object(forKey: url as NSString)
+    func fetchImageBy(url: String) async -> UIImage? {
+        print("downloading \(url)")
+        if let image = ImageManager.imageCache.object(forKey: url as NSString) {
             print("fetched from cache")
             return image
         } else {
-            let data = await getData(from: url)
+            let data = await fetchData(from: url)
             guard let data = data, let image = UIImage(data: data) else {
                 return nil
             }
 
-            PhotosApiFetcher.imageCache.setObject(image, forKey: url as NSString)
+            ImageManager.imageCache.setObject(image, forKey: url as NSString)
             print("image downloaded")
             return image
         }
     }
     
-    func fetchImageFromApiBy(id: String) async -> PhotoListApiResponse? {
+    func fetchImageBy(id: String) async -> PhotoListApiResponse? {
         guard let url = constructURL(path: "/photos/" + id, queryItems: [
             URLQueryItem(name: "client_id", value: clientId)
         ]) else {
             return nil
         }
         
-        guard let data = await getData(from: url) else {
+        guard let data = await fetchData(from: url) else {
             return nil
         }
         
@@ -118,4 +104,14 @@ struct PhotosApiFetcher {
         }
     }
     
+    private func constructURL(path: String, queryItems: [URLQueryItem]) -> String? {
+        var url = URLComponents()
+        url.scheme = "https"
+        url.host = "api.unsplash.com"
+        url.path = path
+        url.queryItems = queryItems
+        
+        print("url constructed")
+        return url.url?.absoluteString
+    }
 }

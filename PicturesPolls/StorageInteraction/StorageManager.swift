@@ -1,13 +1,15 @@
 import Foundation
 
-class FavoritePhotosManager{
+struct StorageManager {
     
-    private static var storageKey = "photos"
+    private static let storageKey = "favoritePhotos"
     
     static var favoriteImagesIds = Set(UserDefaults.standard.object(forKey: storageKey) as? Array<String> ?? []){
-        didSet{
+        didSet {
             UserDefaults.standard.set(Array<String>(favoriteImagesIds), forKey: storageKey)
             print(favoriteImagesIds.count)
         }
     }
+    
+    
 }

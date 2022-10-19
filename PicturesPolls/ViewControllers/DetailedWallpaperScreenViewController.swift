@@ -9,11 +9,12 @@ import UIKit
 
 class DetailedWallpaperScreen: UITableViewController  {
     
+    let imageManager = ImageManager()
+    
     var addToFavoriteButton: UIBarButtonItem!
     var saveToGalleryButton: UIBarButtonItem!
     
     var fullImageURL: String = ""
-    var rawImageURL: String = ""
     var authorUsername: String = ""
     var isFavorite: Bool!
     var imageId: String = ""
@@ -41,22 +42,25 @@ class DetailedWallpaperScreen: UITableViewController  {
     }
     
     override func viewWillAppear(_ animated: Bool) {
-        isFavorite = FavoritePhotosManager.favoriteImagesIds.contains(imageId)
+        super.viewWillAppear(animated)
+        isFavorite = StorageManager.favoriteImagesIds.contains(imageId)
         
         addToFavoriteButton.image = UIImage(systemName: isFavorite ? "heart.fill" : "heart")
     }
     
     @objc func addToFavorite() {
         if isFavorite {
-            FavoritePhotosManager.favoriteImagesIds.remove(imageId)
+            StorageManager.favoriteImagesIds.remove(imageId)
             addToFavoriteButton.image = UIImage(systemName: "heart")
             isFavorite = false
         }
-        else{
-            FavoritePhotosManager.favoriteImagesIds.insert(imageId)
+        else {
+            StorageManager.favoriteImagesIds.insert(imageId)
             addToFavoriteButton.image = UIImage(systemName: "heart.fill")
             isFavorite = true
         }
+        
+        NotificationCenter.default.post(name: .favoritePhotosListDidChange, object: nil)
     }
     
     @objc func saveToGallery() {
@@ -96,20 +100,17 @@ class DetailedWallpaperScreen: UITableViewController  {
         switch indexPath.row {
         case 0:
             cell = UITableViewCell()
-
-
-            Task.init(priority: .high) { [weak self] in
-                let photoFromAPIfetcher = PhotosApiFetcher()
-                let photo = await photoFromAPIfetcher.getImageBy(url: self?.fullImageURL ?? "")
-                guard let _ = photo else {
+            Task.init { [weak self] in
+                let photo = await self?.imageManager.fetchImageBy(url: self?.fullImageURL ?? "")
+                guard let photo = photo else {
                     print("return")
                     return
                 }
                 
-                    self?.fullImageView.image = photo!
-                    self?.saveToGalleryButton.isEnabled = true
+                self?.fullImageView.image = photo
+                self?.saveToGalleryButton.isEnabled = true
             }
-            print(self.tabBarController == nil)
+            
             fullImageView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: CGFloat(view.bounds.height - ((self.tabBarController?.tabBar.frame.height)!) - (self.navigationController?.navigationBar.frame.height)! - UIApplication.shared.statusBarFrame.height))
             cell.addSubview(self.fullImageView)
         case 1:
@@ -135,8 +136,12 @@ class DetailedWallpaperScreen: UITableViewController  {
         }
     }
     
-    deinit{
-        print("detailed screen destroyed")
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.cellForRow(at: indexPath)?.selectionStyle = .none
+    }
+    
+    deinit {
+        imageManager.dataTasks.forEach { $0.cancel() }
     }
 
 }

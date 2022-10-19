@@ -4,7 +4,7 @@ class ImageCollectionViewCell: UICollectionViewCell {
     static let indentifier = "ImageCollectionViewCell"
     
     var currentImageURL = ""
-    let photosAPIFetcher = PhotosApiFetcher()
+    let imageManager = ImageManager()
     
     private let imageView: UIImageView = {
         let imageView = UIImageView()
@@ -34,20 +34,14 @@ class ImageCollectionViewCell: UICollectionViewCell {
         imageView.image = nil
     }
     
-    func configure(with url: String) {
-        Task.init(priority: .background) { [weak self] in
-            self?.currentImageURL = url
-            guard let image = await self?.photosAPIFetcher.getImageBy(url: url) else {
-                return
-            }
-            
-            if url == currentImageURL {
-                self?.imageView.image = image
-            }
+    func configure(with url: String) async {
+        self.currentImageURL = url
+        guard let image = await self.imageManager.fetchImageBy(url: url) else {
+            return
         }
-    }
-    
-    deinit {
-        print("cell destroyed")
+        
+        if url == currentImageURL {
+            self.imageView.image = image
+        }
     }
 }

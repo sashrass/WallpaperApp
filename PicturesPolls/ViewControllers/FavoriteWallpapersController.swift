@@ -8,36 +8,22 @@
 import UIKit
 
 class FavoriteWallpapersController: AllWallpapersViewController {
-    
-    var isJustLoaded = true
-    
-    override func viewWillAppear(_ animated: Bool) {
-        if isJustLoaded {
-            isJustLoaded = false
-            return
-        }
         
-        if imagesFromAPIresponse.count != FavoritePhotosManager.favoriteImagesIds.count{
-            numberOfElements = 0
-            collectionView?.reloadData()
-            imagesFromAPIresponse = []
-            fetchPhotos()
-        }
-
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        subscribeToNotifications()
     }
     
-    override func fetchPhotos() {
-        Task.init(priority: .high) { [unowned self] in
-            var imagesFromAPI = [PhotoListApiResponse]()
-            let photoAPIfetcher = PhotosApiFetcher()
-            for id in FavoritePhotosManager.favoriteImagesIds{
-                guard let image = await photoAPIfetcher.fetchImageFromApiBy(id: id) else{
-                    continue
-                }
-                imagesFromAPI.append(image)
+    override func fetchPhotos() async {
+        var imagesFromAPI = [PhotoListApiResponse]()
+        
+        for id in StorageManager.favoriteImagesIds {
+            guard let image = await imageManager.fetchImageBy(id: id) else {
+                continue
             }
-            imagesFromAPIresponse.append(contentsOf: imagesFromAPI)
+            imagesFromAPI.append(image)
         }
+        images.append(contentsOf: imagesFromAPI)
     }
     
     override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -48,5 +34,19 @@ class FavoriteWallpapersController: AllWallpapersViewController {
         configureImageForCell(indexPath: indexPath, cell: cell)
 
         return cell
+    }
+    
+    private func subscribeToNotifications() {
+        NotificationCenter.default.addObserver(self, selector: #selector(reloadPhotosCollectionView), name: .favoritePhotosListDidChange, object: nil)
+    }
+    
+    @objc private func reloadPhotosCollectionView() {
+        numberOfElements = 0
+        images = []
+        collectionView?.reloadData()
+        
+        Task.init {
+            await fetchPhotos()
+        }
     }
 }
