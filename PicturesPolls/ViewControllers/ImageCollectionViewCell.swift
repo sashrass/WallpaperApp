@@ -3,6 +3,9 @@ import UIKit
 class ImageCollectionViewCell: UICollectionViewCell {
     static let indentifier = "ImageCollectionViewCell"
     
+    var currentImageURL = ""
+    let photosAPIFetcher = PhotosApiFetcher()
+    
     private let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.clipsToBounds = true
@@ -33,12 +36,14 @@ class ImageCollectionViewCell: UICollectionViewCell {
     
     func configure(with url: String) {
         Task.init(priority: .background) { [weak self] in
-            let photoAPIfetcher = PhotosApiFetcher()
-            guard let image = await photoAPIfetcher.getImageBy(url: url) else {
+            self?.currentImageURL = url
+            guard let image = await self?.photosAPIFetcher.getImageBy(url: url) else {
                 return
             }
             
+            if url == currentImageURL {
                 self?.imageView.image = image
+            }
         }
     }
     
